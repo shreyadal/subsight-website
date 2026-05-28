@@ -66,7 +66,7 @@ export function HeroCardStack() {
         ))}
       </div>
 
-      <div className="absolute right-0 bottom-0 translate-y-[calc(100%+12px)] hidden xl:block">
+      <div className="absolute left-1/2 -translate-x-1/2 bottom-0 translate-y-[calc(100%+12px)] hidden xl:block">
         <div className="w-[260px] rounded-xl bg-bg-card hairline-ai shadow-pop p-3.5 animate-fade-in">
           <div className="flex items-center gap-2 mb-2">
             <AIDot size={5} />

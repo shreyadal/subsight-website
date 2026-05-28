@@ -21,7 +21,17 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const status = message.includes("not connected") || message.includes("expired") ? 400 : 500;
+
+    if (message === "ALREADY_SYNCING") {
+      return NextResponse.json(
+        { error: "A sync is already running. Please wait a moment." },
+        { status: 409 }
+      );
+    }
+
+    const status =
+      message.includes("not connected") || message.includes("expired") ? 400 : 500;
+
     return NextResponse.json({ error: message }, { status });
   }
 }

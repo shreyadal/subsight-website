@@ -257,13 +257,13 @@ function Step2({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) {
             ))}
           </div>
 
-          <button
-            onClick={onNext}
+          <a
+            href="/api/auth/gmail/connect"
             className="w-full h-12 rounded-xl bg-bg-card hairline-strong hover:bg-bg-edge transition flex items-center justify-center gap-3 text-[13.5px] text-ink mb-3"
           >
             <span className="w-5 h-5 rounded-[5px] bg-ink flex items-center justify-center text-bg font-medium text-[12px]">G</span>
-            Connect Gmail
-          </button>
+            Connect Gmail with Google
+          </a>
           <div className="text-center text-[11.5px] text-ink-faint font-mono">
             <button onClick={onSkip} className="hover:text-ink">skip — I&apos;ll add Gmail later →</button>
           </div>

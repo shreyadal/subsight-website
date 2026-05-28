@@ -17,30 +17,25 @@ interface EmailLogRow {
   amount_inr: number | null;
   tag: string;
   email_date: string;
+  confidence: number | null;
+  detected_by: string | null;
 }
 
 const MOCK_STATS = {
-  gmailEmail: "aanya@acme.in",
-  emailsScanned: 2841,
-  subscriptionsFound: 11,
-  trialsDetected: 2,
-  lastSyncedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
-  isConnected: true,
+  gmailEmail: "demo@example.com",
+  emailsScanned: 0,
+  subscriptionsFound: 0,
+  trialsDetected: 0,
+  lastSyncedAt: new Date().toISOString(),
+  isConnected: false,
+  isSyncing: false,
 };
-
-const MOCK_MATCHES = [
-  { fromAddress: "billing@netflix.com",  subject: "Your Netflix subscription receipt — May 2026",     merchantName: "Netflix",    amountInr: 649,  tag: "subscription", emailDate: new Date(Date.now() - 1 * 86400000).toISOString() },
-  { fromAddress: "no-reply@adobe.com",   subject: "Adobe Creative Cloud — Invoice #INV-20260502",      merchantName: "Adobe",      amountInr: 4719, tag: "invoice",      emailDate: new Date(Date.now() - 4 * 86400000).toISOString() },
-  { fromAddress: "trial@midjourney.com", subject: "Your Midjourney trial ends in 2 days",              merchantName: "Midjourney", amountInr: 830,  tag: "trial",        emailDate: new Date(Date.now() - 5 * 86400000).toISOString() },
-  { fromAddress: "billing@spotify.com",  subject: "Spotify Family — receipt for May 2026",             merchantName: "Spotify",    amountInr: 179,  tag: "subscription", emailDate: new Date(Date.now() - 6 * 86400000).toISOString() },
-  { fromAddress: "receipts@canva.com",   subject: "Canva Pro · Workspace invoice",                     merchantName: "Canva",      amountInr: 499,  tag: "invoice",      emailDate: new Date(Date.now() - 8 * 86400000).toISOString() },
-];
 
 export default async function GmailPage() {
   const hasSupabase = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
   if (!hasSupabase) {
-    return <GmailPageClient stats={MOCK_STATS} matches={MOCK_MATCHES} />;
+    return <GmailPageClient stats={MOCK_STATS} matches={[]} />;
   }
 
   const supabase = await createServerClient();
@@ -55,29 +50,46 @@ export default async function GmailPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  const { data: conn } = await db
+  const { data: conn } = (await db
     .from("gmail_connections")
     .select("email, status, emails_scanned, subscriptions_detected, trials_detected, last_synced_at")
     .eq("user_id", user.id)
-    .maybeSingle() as { data: ConnectionRow | null };
+    .maybeSingle()) as { data: ConnectionRow | null };
 
-  const { data: emailLog } = await db
+  // Fetch email log including new debug columns
+  const { data: emailLog, error: logError } = (await db
     .from("gmail_email_log")
-    .select("from_address, subject, merchant_name, amount_inr, tag, email_date")
+    .select("from_address, subject, merchant_name, amount_inr, tag, email_date, confidence, detected_by")
     .eq("user_id", user.id)
     .order("email_date", { ascending: false })
-    .limit(50) as { data: EmailLogRow[] | null };
+    .limit(50)) as { data: EmailLogRow[] | null; error: unknown };
+
+  if (logError) {
+    console.error("[gmail:page] Error fetching email log:", logError);
+  }
+
+  const isConnected = conn?.status === "active" || conn?.status === "syncing";
+  const isSyncing = conn?.status === "syncing";
 
   const stats = conn
     ? {
         gmailEmail: conn.email,
-        emailsScanned: conn.emails_scanned,
-        subscriptionsFound: conn.subscriptions_detected,
-        trialsDetected: conn.trials_detected,
-        lastSyncedAt: conn.last_synced_at,
-        isConnected: conn.status === "active",
+        emailsScanned: conn.emails_scanned ?? 0,
+        subscriptionsFound: conn.subscriptions_detected ?? 0,
+        trialsDetected: conn.trials_detected ?? 0,
+        lastSyncedAt: conn.last_synced_at ?? new Date().toISOString(),
+        isConnected,
+        isSyncing,
       }
-    : { gmailEmail: user.email ?? "", emailsScanned: 0, subscriptionsFound: 0, trialsDetected: 0, lastSyncedAt: new Date().toISOString(), isConnected: false };
+    : {
+        gmailEmail: user.email ?? "",
+        emailsScanned: 0,
+        subscriptionsFound: 0,
+        trialsDetected: 0,
+        lastSyncedAt: new Date().toISOString(),
+        isConnected: false,
+        isSyncing: false,
+      };
 
   const matches = (emailLog ?? []).map((row) => ({
     fromAddress: row.from_address,
@@ -86,6 +98,8 @@ export default async function GmailPage() {
     amountInr: row.amount_inr,
     tag: row.tag,
     emailDate: row.email_date,
+    confidence: row.confidence,
+    detectedBy: row.detected_by,
   }));
 
   return <GmailPageClient stats={stats} matches={matches} />;
